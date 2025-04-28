@@ -7,30 +7,19 @@ import {
   Tab,
   Flex,
   useColorModeValue,
-  TableContainer,
-  Box,
   Grid,
   GridItem,
 } from "@chakra-ui/react";
 import AccordionContainer from "./accordionContainer";
-import SubmitCodeEditor from "./submitCodeEditor";
 import Database from "../../data";
-import socket from "../../socket";
-import SubmissionsTable from "./submissionsTable";
-import ChatBox from "./chatBox";
 
 const TabContainer = ({
   id,
   duelPlatform,
   duelStatus,
-  players,
   playerNum,
   problems,
   problemVerdicts,
-  submissionsRefresh,
-  onSubmissionsRefresh,
-  submissionsToast,
-  onSubmissionsToast,
   mathJaxRendered,
   onMathJaxRendered,
   replacingProblems,

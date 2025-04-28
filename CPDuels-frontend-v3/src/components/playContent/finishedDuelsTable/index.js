@@ -82,9 +82,6 @@ const FinishedDuelsTable = ({ duels, setRefresh }) => {
               textAlign="center"
             >
               <option value="All">All Platforms</option>
-              <option value="CF">Codeforces</option>
-              <option value="AT">AtCoder</option>
-              <option value="LC">LeetCode</option>
             </Select>
           </HStack>
         </FormControl>

@@ -181,7 +181,7 @@ const CreateDuelForm = () => {
                     </NumberInputStepper>
                   </NumberInput>
                 </Flex>
-                <Center>
+                {/* <Center>
                   <Slider
                     mt={1}
                     width="12em"
@@ -199,7 +199,7 @@ const CreateDuelForm = () => {
                     </SliderTrack>
                     <SliderThumb boxSize="1em" bg={sliderThumbColor} />
                   </Slider>
-                </Center>
+                </Center> */}
                 {ratingMinError ? (
                   <FormErrorMessage mt={0}>
                     Invalid difficulty minimum.
@@ -238,7 +238,7 @@ const CreateDuelForm = () => {
                     </NumberInputStepper>
                   </NumberInput>
                 </Flex>
-                <Center>
+                {/* <Center>
                   <Slider
                     mt={1}
                     width="12em"
@@ -256,7 +256,7 @@ const CreateDuelForm = () => {
                     </SliderTrack>
                     <SliderThumb boxSize="1em" bg={sliderThumbColor} />
                   </Slider>
-                </Center>
+                </Center> */}
                 {ratingMaxError ? (
                   <FormErrorMessage mt={0}>
                     Invalid difficulty maximum.
@@ -379,7 +379,7 @@ const CreateDuelForm = () => {
           <FormControl isInvalid={problemCountError} isRequired>
             <Flex justify="space-between">
               <FormLabel my="auto" mr={0}>
-                # Problems
+                Problems
               </FormLabel>
               <NumberInput
                 value={problemCount}
@@ -398,8 +398,8 @@ const CreateDuelForm = () => {
                 </NumberInputStepper>
               </NumberInput>
             </Flex>
-            <Center>
-              <Slider
+            {/* <Center> */}
+              {/* <Slider
                 mt={1}
                 width="12em"
                 focusThumbOnChange={false}
@@ -413,7 +413,7 @@ const CreateDuelForm = () => {
                 </SliderTrack>
                 <SliderThumb boxSize="1em" bg={sliderThumbColor} />
               </Slider>
-            </Center>
+            </Center> */}
             {problemCountError ? (
               <FormErrorMessage mt={0}>Invalid problem count.</FormErrorMessage>
             ) : (
@@ -445,7 +445,7 @@ const CreateDuelForm = () => {
                 </NumberInputStepper>
               </NumberInput>
             </Flex>
-            <Center>
+            {/* <Center>
               <Slider
                 mt={1}
                 width="12em"
@@ -460,7 +460,7 @@ const CreateDuelForm = () => {
                 </SliderTrack>
                 <SliderThumb boxSize="1em" bg={sliderThumbColor} />
               </Slider>
-            </Center>
+            </Center> */}
             {timeLimitError ? (
               <FormErrorMessage mt={0}>Invalid time limit.</FormErrorMessage>
             ) : (
@@ -473,7 +473,7 @@ const CreateDuelForm = () => {
       <GridItem>
         <Center>
           <FormControl isInvalid={usernameError}>
-            <FormLabel my="auto">Username (optional)</FormLabel>
+            <FormLabel my="auto">CodeForces ID </FormLabel>
             <Input
               mt={1}
               type="text"
@@ -489,14 +489,14 @@ const CreateDuelForm = () => {
             {usernameError ? (
               <FormErrorMessage>Max length: 20 characters</FormErrorMessage>
             ) : (
-              <FormHelperText mt={1}>What shall we call you?</FormHelperText>
+              <FormHelperText mt={1}>What's your CF Id?</FormHelperText>
             )}
           </FormControl>
         </Center>
       </GridItem>
       <GridItem>
         <Center>
-          <FormControl>
+          {/* <FormControl>
             <FormLabel my="auto">Private?</FormLabel>
             <Switch
               mt={1}
@@ -507,7 +507,7 @@ const CreateDuelForm = () => {
             <FormHelperText mt={1}>
               Private matches don't show up on the table (invite-only).
             </FormHelperText>
-          </FormControl>
+          </FormControl> */}
         </Center>
       </GridItem>
       <GridItem colSpan={2}>

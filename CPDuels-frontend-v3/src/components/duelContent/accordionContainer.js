@@ -5,17 +5,9 @@ import {
   AccordionButton,
   AccordionIcon,
   AccordionPanel,
-  AccordionProps,
   Box,
   Center,
   Button,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalCloseButton,
-  ModalBody,
-  ModalFooter,
   useColorModeValue,
   useDisclosure,
   ButtonGroup,
@@ -23,14 +15,12 @@ import {
   Flex,
   Text,
 } from "@chakra-ui/react";
-import SubmitCodeEditor from "./submitCodeEditor";
 import socket from "../../socket";
 import Database, { getUID } from "../../data";
 import "./cfStyles.css";
 import "./lcStyles.css";
 import { RepeatIcon } from "@chakra-ui/icons";
 import { MathJax } from "better-react-mathjax";
-import { codes_to_snippets } from "./submitCodeEditor/languages";
 
 const AccordionContainer = ({
   id,
@@ -606,36 +596,6 @@ const AccordionContainer = ({
               </AccordionItem>
             ))
           : ""}
-        <Modal
-          isOpen={isOpen}
-          onClose={onClose}
-          size="2xl"
-          motionPreset="slideInBottom"
-          closeOnOverlayClick={false}
-          closeOnEsc={false}
-        >
-          <ModalOverlay />
-          <ModalContent top="0">
-            <ModalHeader pb={0}>Submit Your Answer</ModalHeader>
-            <ModalCloseButton />
-            <ModalBody width="675px" pb={3}>
-              <SubmitCodeEditor
-                key="floating-editor"
-                duelStatus={duelStatus}
-                playerNum={playerNum}
-                duelPlatform={duelPlatform}
-                editorId="floating-editor"
-                isPopup={true}
-                problemChosen={selectedProblem}
-                numProblems={problems.length}
-                problems={problems}
-                problemSubmitReceived={problemSubmitReceived}
-                onProblemSubmitReceived={onProblemSubmitReceived}
-                duelId={id}
-              />
-            </ModalBody>
-          </ModalContent>
-        </Modal>
       </Accordion>
     ) : (
       problems?.length ? (
