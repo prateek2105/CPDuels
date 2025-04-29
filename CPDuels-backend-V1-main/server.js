@@ -1,5 +1,4 @@
 import express, { response } from 'express';
-import mongoose from 'mongoose';
 import duelsRouter from './routes/duelsRouter.js';
 import cfproblemsRouter from './routes/cfproblemsRouter.js';
 import DuelManager from './utils/duelManager.js';
@@ -12,6 +11,7 @@ import { sleep } from './utils/helpers.js';
 import cors from 'cors';
 import CodeforcesAPI from './utils/codeforcesAPI.js';
 import 'dotenv/config';
+import initializeDatabase from './config/db/init.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -23,15 +23,21 @@ var corsOptions = {
 
 app.use(cors(corsOptions))
 const PORT = process.env.PORT || 8080;
-const DATABASE_URL = process.env.DATABASE_URL || "mongodb+srv://CPDuels:wrongfulphrasenimblemonumentshindigcardstockvastlyappraisalcloaktremor@cpduels.s78kdcw.mongodb.net/?retryWrites=true&w=majority";
 
-mongoose.connect(DATABASE_URL);
-const db = mongoose.connection;
-db.on('error', (err) => console.log(err));
-db.once('open', async () => console.log("Connected to database."));
-while(mongoose.connection.readyState != 1) {
-    await sleep(1000);
-}
+// Initialize PostgreSQL database
+let db;
+const initDB = async () => {
+  try {
+    db = await initializeDatabase();
+    console.log("Connected to PostgreSQL database.");
+  } catch (err) {
+    console.error("Database connection failed:", err);
+    process.exit(1); // Exit if database connection fails
+  }
+};
+
+// Wait for database connection
+await initDB();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));

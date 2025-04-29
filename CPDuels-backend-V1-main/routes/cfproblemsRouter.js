@@ -1,12 +1,13 @@
 import express from 'express';
-import { cfproblemModel } from '../models/models.js';
+import db from '../models/postgres/index.js';
 
 const cfproblemsRouter = express.Router();
+const CFProblem = db.CFProblem;
 
 // GET all problems
 cfproblemsRouter.get('/', async (req, res) => {
   try {
-    const problems = await cfproblemModel.find();
+    const problems = await CFProblem.findAll();
     res.send(problems);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -20,9 +21,8 @@ cfproblemsRouter.get('/:id', getProblem, (req, res) => {
 
 // POST one problem
 cfproblemsRouter.post('/add', async (req, res) => {
-  const problem = new cfproblemModel(req.body);
   try {
-    const newProblem = await problem.save();
+    const newProblem = await CFProblem.create(req.body);
     res.status(201).json(newProblem);
   } catch (err) {
     res.status(400).json({ message: err.message });
@@ -30,14 +30,19 @@ cfproblemsRouter.post('/add', async (req, res) => {
 });
 
 // PATCH one problem
-cfproblemsRouter.get('/:id', getProblem, (req, res) => {
-
+cfproblemsRouter.patch('/:id', getProblem, async (req, res) => {
+  try {
+    await res.problem.update(req.body);
+    res.json(await res.problem.reload());
+  } catch (err) {
+    res.status(400).json({ message: err.message });
+  }
 });
 
 // DELETE one problem
 cfproblemsRouter.delete('/:id', getProblem, async (req, res) => {
   try {
-    await res.problem.delete();
+    await res.problem.destroy();
     res.json({ message: "Problem deleted." });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -47,7 +52,7 @@ cfproblemsRouter.delete('/:id', getProblem, async (req, res) => {
 // DELETE all problems
 cfproblemsRouter.delete('/', async (req, res) => {
   try {
-    await cfproblemModel.deleteMany();
+    await CFProblem.destroy({ where: {} });
     res.json({ message: "All problems deleted." });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -57,11 +62,11 @@ cfproblemsRouter.delete('/', async (req, res) => {
 async function getProblem(req, res, next) {
   let problem;
   try {
-    problem = await cfproblemModel.findById(req.params.id);
-    // Check for error and immediately return to avoid setting res.subscriber
-    if (problem == null) return res.status(404).json({ message: "Problem not found." });
+    problem = await CFProblem.findByPk(req.params.id);
+    if (problem == null) {
+      return res.status(404).json({ message: "Problem not found." });
+    }
   } catch (err) {
-    // Immediately return in case of error to avoid setting res.subscriber
     return res.status(500).json({ message: err.message });
   }
   

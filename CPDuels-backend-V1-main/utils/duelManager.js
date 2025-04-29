@@ -1,48 +1,47 @@
-import db from "../server.js";
+import db from "../models/postgres/index.js";
 import CodeforcesAPI from "./codeforcesAPI.js";
-import mongoose from "mongoose";
-import { ObjectId } from "mongodb";
 import TaskManager from "./taskManager.js";
-
+import { Op } from "sequelize";
 
 class DuelManager {
 
     static async findDuel(id) {
         try {
-            let duels = await db.collection('duels').find({
-                _id: ObjectId(id)
-            }, {}).toArray();
-            if (duels.length != 0 ) return duels[0];
+            const duel = await db.Duel.findByPk(id, {
+                include: [
+                    { model: db.Player, as: 'players' },
+                    { model: db.Problem, as: 'problems' }
+                ]
+            });
+            return duel ? duel.toJSON() : null;
         } catch (err) {
-            console.log("Error: invalid getDuelState() request... Probably an invalid id.");
+            console.log("Error: invalid findDuel() request... Probably an invalid id.");
+            console.error(err);
+            return null;
         }
-        return null; // if no duel found
     }
 
     static async getDuelState(id) {
         try {
-            let duels = await db.collection('duels').find({
-                _id: ObjectId(id)
-            }, {}).toArray();
-            if (duels.length != 0 ) return duels[0].status;
+            const duel = await db.Duel.findByPk(id);
+            return duel ? duel.status : null;
         } catch (err) {
             console.log("Error: invalid getDuelState() request... Probably an invalid id.");
+            console.error(err);
+            return null;
         }
-        return null; // if no duel found
     }
 
     static async changeDuelState(id, state) {
         console.log('Duel ' + id + ' State Changed to ' + state);
-        await db.collection('duels').findOneAndUpdate(
-            {
-                _id: ObjectId(id)
-            },
-            {
-                $set: {
-                    status: state
-                }
-            }
-        );
+        try {
+            await db.Duel.update(
+                { status: state },
+                { where: { id: id } }
+            );
+        } catch (err) {
+            console.error("Error changing duel state:", err);
+        }
     }
 
     static async startDuel(id) {
@@ -51,16 +50,14 @@ class DuelManager {
         
         // Then set the start time
         var startTime = new Date().getTime() / 1000;
-        await db.collection('duels').findOneAndUpdate(
-            {
-                _id: ObjectId(id)
-            },
-            {
-                $set: {
-                    startTime: startTime
-                }
-            }
-        );
+        try {
+            await db.Duel.update(
+                { startTime: startTime },
+                { where: { id: id } }
+            );
+        } catch (err) {
+            console.error("Error updating start time:", err);
+        }
 
         // Finally change state to ONGOING after everything is set up
         await this.changeDuelState(id, 'ONGOING');
@@ -71,204 +68,267 @@ class DuelManager {
         await this.changeDuelState(id, 'FINISHED');
         await this.checkProblemSolves(id);
         let winner = await this.findWinner(id);
-        await db.collection('duels').findOneAndUpdate(
-            {
-                _id: ObjectId(id)
-            },
-            {
-                $set: {
-                    result: winner
-                }
-            }
-        );
+        
+        try {
+            await db.Duel.update(
+                { result: winner },
+                { where: { id: id } }
+            );
+        } catch (err) {
+            console.error("Error updating duel result:", err);
+        }
     }
 
     static async addDuelPlayer(id, handle, uid) {
-        await db.collection('duels').findOneAndUpdate(
-            {
-                _id: ObjectId(id)
-            },
-            {
-                $push: {
-                    players: {
-                        handle: handle,
-                        uid: uid,
-                        ready: true // Set player as ready by default
-                    }
+        try {
+            // Get duel
+            const duel = await db.Duel.findByPk(id);
+            if (!duel) return;
+            
+            // Check if player exists, create if not
+            let player = await db.Player.findOne({ where: { uid: uid } });
+            if (!player) {
+                player = await db.Player.create({
+                    handle: handle,
+                    uid: uid
+                });
+            } else {
+                // Update handle if needed
+                if (player.handle !== handle) {
+                    await player.update({ handle: handle });
                 }
             }
-        );
+            
+            // Add association
+            await duel.addPlayer(player);
+        } catch (err) {
+            console.error("Error adding player to duel:", err);
+        }
     }
 
     static async addProblems(id) {
-        let duel = await this.findDuel(id);
-        let handles = [duel.players[0].handle, duel.players[1].handle];
-        let problems = await TaskManager.getDuelProblems(duel.problemCount, handles, duel.ratingMin, duel.ratingMax);
+        try {
+            const duel = await this.findDuel(id);
+            if (!duel || !duel.players || duel.players.length < 2) return;
+            
+            let handles = [duel.players[0].handle, duel.players[1].handle];
+            let cfProblems = await TaskManager.getDuelProblems(
+                duel.problemCount, handles, duel.ratingMin, duel.ratingMax
+            );
+            
+            // Get the actual duel object to use Sequelize methods
+            const duelObj = await db.Duel.findByPk(id);
+            
+            /* Points
+            Each problem's points is equal to the amount of rating above the rating range minimum, plus 100
+            If the rating range delta is 0, each problem is worth 100 points
+            */
+            for (let i = 0; i < cfProblems.length; i++) {
+                // Find original CF problem in database or create it if not found
+                let [cfProblem] = await db.CFProblem.findOrCreate({
+                    where: { 
+                        contestId: cfProblems[i].contestId,
+                        index: cfProblems[i].index
+                    },
+                    defaults: {
+                        name: cfProblems[i].name,
+                        type: cfProblems[i].type || 'PROGRAMMING',
+                        points: cfProblems[i].points,
+                        rating: cfProblems[i].rating,
+                        tags: cfProblems[i].tags || []
+                    }
+                });
 
-        /* Points
-        Each problem's points is equal to the amount of rating above the rating range minimum, plus 100
-        If the rating range delta is 0, each problem is worth 100 points
-        */
-        for (let i = 0; i < problems.length; i++) {
-            problems[i].points = (problems[i].rating - duel.ratingMin) + 100;
-            problems[i].playerOneScore = 0;
-            problems[i].playerTwoScore = 0;
-            problems[i].playerOneAttempts = 0;
-            problems[i].playerTwoAttempts = 0;
-        }
-
-        await db.collection('duels').findOneAndUpdate(
-            {
-                _id: ObjectId(id)
-            },
-            {
-                $set: {
-                    problems: problems
-                }
+                // Create duel problem
+                let problem = await db.Problem.create({
+                    contestId: cfProblems[i].contestId,
+                    index: cfProblems[i].index,
+                    name: cfProblems[i].name,
+                    type: cfProblems[i].type || 'PROGRAMMING',
+                    points: (cfProblems[i].rating - duel.ratingMin) + 100,
+                    tags: cfProblems[i].tags || [],
+                    databaseId: cfProblem.id, // Link to original CF problem
+                    playerOneScore: 0,
+                    playerTwoScore: 0,
+                    playerOneAttempts: 0,
+                    playerTwoAttempts: 0
+                });
+                
+                // Associate problem with duel
+                await duelObj.addProblem(problem);
             }
-        );
-        console.log(problems);
+            
+            console.log("Added problems to duel:", id);
+        } catch (err) {
+            console.error("Error adding problems to duel:", err);
+        }
     }
 
     static async updateProblemScores(playerNum, solves, id) {
-        /* Scores
-        Each attempt increases attempt number. Only correct submissions affect score.
-        Attempt number increases penalty (10%). If a player gets it right once, submissions afterwards
-        do not affect score. The player's score is bounded below by 0.
-        */
+        try {
+            const duel = await this.findDuel(id);
+            if (!duel) return;
+            
+            const problems = duel.problems;
+            if (playerNum === 0) { // player one
+                // Recalculate the number of attempts if problem not solved
+                for (let i = 0; i < problems.length; i++) {
+                    if (problems[i].playerOneScore === 0) {
+                        problems[i].playerOneAttempts = 0; // Reset if not solved
+                    }
+                }
 
-        // go through all submissions and for each problem check if solved
-        // if solved skip submission, otherwise check if verdict is OK which will 
-        //duel.problems[i].contestId, duel.problems[i].index
-        let duel = await DuelManager.findDuel(id);
-        let problems = duel.problems;
-        if (!problems) return; // problems undefined bug
-        if (playerNum === 0) {
-            // recalculate the number of attempts if problem not solved
-            problems = problems.map((problem) => {
-                return {
-                    ...problem, 
-                    playerOneAttempts: (problem.playerOneScore === 0 ? 0 : problem.playerOneAttempts)
+                for (let i = 0; i < solves.length; i++) {
+                    for (let k = 0; k < problems.length; k++) {
+                        if (problems[k].playerOneScore > 0) continue; // If player already solved, stop considering
+                        if (solves[i].index === problems[k].index && solves[i].contestId === problems[k].contestId) {
+                            // Submission for problem match
+                            if (solves[i].verdict === 'TESTING') {
+                                continue;
+                            }
+                            if (solves[i].verdict === 'OK') {
+                                let penalty = problems[k].playerOneAttempts * 0.1 * problems[k].points;
+                                problems[k].playerOneScore = Math.max(0, problems[k].points - penalty);
+                            }
+                            problems[k].playerOneAttempts++;
+                            
+                            // Update problem in database
+                            await db.Problem.update({
+                                playerOneScore: problems[k].playerOneScore,
+                                playerOneAttempts: problems[k].playerOneAttempts
+                            }, {
+                                where: { id: problems[k].id }
+                            });
+                        }
+                    }
                 }
-            });
-            for (let i = 0; i < solves.length; i++) {
-                for (let k = 0; k < problems.length; k++) {
-                    if (problems[k].playerOneScore > 0) continue; // if player already solved, stop considering
-                    if (solves[i].index===problems[k].index && solves[i].contestId===problems[k].contestId) {
-                        // submission for problem match
-                        if (solves[i].verdict==='TESTING') {
-                            continue;
+            } else { // player two
+                // Recalculate the number of attempts if problem not solved
+                for (let i = 0; i < problems.length; i++) {
+                    if (problems[i].playerTwoScore === 0) {
+                        problems[i].playerTwoAttempts = 0; // Reset if not solved
+                    }
+                }
+
+                for (let i = 0; i < solves.length; i++) {
+                    for (let k = 0; k < problems.length; k++) {
+                        if (problems[k].playerTwoScore > 0) continue; // If player already solved, stop considering
+                        if (solves[i].index === problems[k].index && solves[i].contestId === problems[k].contestId) {
+                            // Submission for problem match
+                            if (solves[i].verdict === 'TESTING') {
+                                continue;
+                            }
+                            if (solves[i].verdict === 'OK') {
+                                let penalty = problems[k].playerTwoAttempts * 0.1 * problems[k].points;
+                                problems[k].playerTwoScore = Math.max(0, problems[k].points - penalty);
+                            }
+                            problems[k].playerTwoAttempts++;
+                            
+                            // Update problem in database
+                            await db.Problem.update({
+                                playerTwoScore: problems[k].playerTwoScore,
+                                playerTwoAttempts: problems[k].playerTwoAttempts
+                            }, {
+                                where: { id: problems[k].id }
+                            });
                         }
-                        if (solves[i].verdict==='OK') {
-                            let penalty = problems[k].playerOneAttempts * 0.1 * problems[k].points;
-                            problems[k].playerOneScore = Math.max(0, problems[k].points - penalty);
-                        }
-                        problems[k].playerOneAttempts++;
                     }
                 }
             }
-        } else { // player two
-            // recalculate the number of attempts if problem not solved
-            problems = problems.map((problem) => {
-                return {
-                    ...problem, 
-                    playerTwoAttempts: (problem.playerTwoScore === 0 ? 0 : problem.playerTwoAttempts)
-                }
-            });
-            for (let i = 0; i < solves.length; i++) {
-                for (let k = 0; k < problems.length; k++) {
-                    if (problems[k].playerTwoScore > 0) continue; // if player already solved, stop considering
-                    if (solves[i].index===problems[k].index && solves[i].contestId===problems[k].contestId) {
-                        // submission for problem match
-                        if (solves[i].verdict==='TESTING') {
-                            continue;
-                        }
-                        if (solves[i].verdict==='OK') {
-                            let penalty = problems[k].playerTwoAttempts * 0.1 * problems[k].points;
-                            problems[k].playerTwoScore = Math.max(0, problems[k].points - penalty);
-                        }
-                        problems[k].playerTwoAttempts++;
-                    }
-                }
-            }
+        } catch (err) {
+            console.error("Error updating problem scores:", err);
         }
-
-        await db.collection('duels').findOneAndUpdate(
-            {
-                _id: ObjectId(id)
-            },
-            {
-                $set: {
-                    problems: problems
-                }
-            }
-        );
     }
 
     static async updateDuelScores(id) {
-        let duel = await this.findDuel(id);
-        let playerOneScore = 0; let playerTwoScore = 0;
-        let playerOneSolves = 0; let playerTwoSolves = 0;
-        for (let i = 0; i < duel.problems.length; i++) {
-            playerOneScore += duel.problems[i].playerOneScore;
-            playerTwoScore += duel.problems[i].playerTwoScore;
-            if (duel.problems[i].playerOneScore) playerOneSolves++;
-            if (duel.problems[i].playerTwoScore) playerTwoSolves++;
-        }
-        await db.collection('duels').findOneAndUpdate(
-            {
-                _id: ObjectId(id)
-            },
-            {
-                $set: {
-                    playerOneScore: playerOneScore,
-                    playerTwoScore: playerTwoScore,
-                    playerOneSolves: playerOneSolves,
-                    playerTwoSolves: playerTwoSolves,
-                }
+        try {
+            let duel = await this.findDuel(id);
+            if (!duel) return;
+            
+            let playerOneScore = 0; 
+            let playerTwoScore = 0;
+            let playerOneSolves = 0; 
+            let playerTwoSolves = 0;
+            
+            for (let i = 0; i < duel.problems.length; i++) {
+                playerOneScore += duel.problems[i].playerOneScore;
+                playerTwoScore += duel.problems[i].playerTwoScore;
+                if (duel.problems[i].playerOneScore) playerOneSolves++;
+                if (duel.problems[i].playerTwoScore) playerTwoSolves++;
             }
-        );
+            
+            await db.Duel.update({
+                playerOneScore: playerOneScore,
+                playerTwoScore: playerTwoScore,
+                playerOneSolves: playerOneSolves,
+                playerTwoSolves: playerTwoSolves
+            }, {
+                where: { id: id }
+            });
+        } catch (err) {
+            console.error("Error updating duel scores:", err);
+        }
     }
 
     static async checkProblemSolves(id) {
-        let duel = await this.findDuel(id);
-        let playerOneSolves = await TaskManager.getUserSolves(duel, duel.players[0].handle);
-        let playerTwoSolves = await TaskManager.getUserSolves(duel, duel.players[1].handle);
-        //duel.problems[i].contestId, duel.problems[i].index
-        if (playerOneSolves) {
-            await this.updateProblemScores(0, playerOneSolves, id);
+        try {
+            let duel = await this.findDuel(id);
+            if (!duel || !duel.players || duel.players.length < 2) return;
+            
+            let playerOneSolves = await TaskManager.getUserSolves(duel, duel.players[0].handle);
+            let playerTwoSolves = await TaskManager.getUserSolves(duel, duel.players[1].handle);
+            
+            if (playerOneSolves) {
+                await this.updateProblemScores(0, playerOneSolves, id);
+            }
+            if (playerTwoSolves) {
+                await this.updateProblemScores(1, playerTwoSolves, id);
+            }
+            await this.updateDuelScores(id);
+        } catch (err) {
+            console.error("Error checking problem solves:", err);
         }
-        if (playerTwoSolves) {
-            await this.updateProblemScores(1, playerTwoSolves, id);
-        }
-        await this.updateDuelScores(id);
     }
     
     static async findWinner(id) {
-        let duel = await this.findDuel(id);
-        if (duel.playerOneScore > duel.playerTwoScore) {
-            return ["WON", duel.players[0].handle];
-        } else if (duel.playerTwoScore > duel.playerOneScore) {
-            return ["WON", duel.players[1].handle];
-        } else {
-            return ["TIE"];
+        try {
+            let duel = await this.findDuel(id);
+            if (!duel) return ["NONE"];
+            
+            if (duel.playerOneScore > duel.playerTwoScore) {
+                return ["WON", duel.players[0].handle];
+            } else if (duel.playerTwoScore > duel.playerOneScore) {
+                return ["WON", duel.players[1].handle];
+            } else {
+                return ["TIE"];
+            }
+        } catch (err) {
+            console.error("Error finding winner:", err);
+            return ["NONE"];
         }
     }
 
     static async isValidJoinRequest(id, handle) {
-        let duel = await this.findDuel(id);
-        if (duel.players.length === 2) { // handle multiple players joining at once
-            return [false, "Duel Full"];
+        try {
+            let duel = await this.findDuel(id);
+            if (!duel) return [false, "Duel not found"];
+            
+            if (duel.players.length === 2) { // handle multiple players joining at once
+                return [false, "Duel Full"];
+            }
+            let owner = duel.players[0];
+            if (owner.handle === handle) {
+                return [false, "Duplicate Handles"];
+            }
+            let validHandle = await CodeforcesAPI.check_handle(handle);
+            if (!validHandle[0]) {
+                return [false, "Invalid Handle"];
+            }
+            return [true];
+        } catch (err) {
+            console.error("Error validating join request:", err);
+            return [false, "Server Error"];
         }
-        let owner = duel.players[0];
-        if (owner.handle === handle) {
-            return [false, "Duplicate Handles"];
-        }
-        let validHandle = await CodeforcesAPI.check_handle(handle);
-        if (!validHandle[0]) {
-            return [false, "Invalid Handle"];
-        }
-        return [true];
     }
 
     static async isValidDuelRequest(players, problemCount, ratingMin, ratingMax, timeLimit) {
