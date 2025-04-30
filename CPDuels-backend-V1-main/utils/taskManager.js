@@ -1,61 +1,120 @@
 import CodeforcesAPI from "./codeforcesAPI.js";
 import DuelManager from "./duelManager.js";
-import db from "../server.js";
+import db from "../models/postgres/index.js";
+import { Op } from "sequelize";
 
 class TaskManager {
     static async updateProblemset() {
-        let problem_list = await CodeforcesAPI.getProblemList();
-        console.log(problem_list);
-        db.collection('cfproblems').insertMany(problem_list);
+        try {
+            let problem_list = await CodeforcesAPI.getProblemList();
+            console.log(problem_list);
+            
+            // Use bulkCreate with updateOnDuplicate to handle existing problems
+            await db.CFProblem.bulkCreate(problem_list.map(problem => ({
+                contestId: problem.contestId,
+                index: problem.index,
+                name: problem.name,
+                type: problem.type || 'PROGRAMMING',
+                points: problem.points,
+                rating: problem.rating,
+                tags: problem.tags || []
+            })), {
+                updateOnDuplicate: ['name', 'type', 'points', 'rating', 'tags']
+            });
+        } catch (err) {
+            console.error("Error updating problemset:", err);
+        }
     }
 
-    static async findCFProblems(filter={}, fields={}) {
-        // filter for the problems we're looking for
-        // fields for the parts of the problems
-        
-        let result = await db.collection('cfproblems').find(filter, fields).toArray();
+    static async findCFProblems(filter = {}, fields = {}) {
+        try {
+            // Convert MongoDB-style filter to Sequelize where clause
+            const whereClause = {};
+            if (filter.rating) {
+                whereClause.rating = {
+                    [Op.gte]: filter.rating.$gte,
+                    [Op.lte]: filter.rating.$lte
+                };
+            }
+            
+            // Convert MongoDB-style fields to Sequelize attributes
+            const attributes = Object.keys(fields).length ? Object.keys(fields) : undefined;
 
-        return result;
+            return await db.CFProblem.findAll({
+                where: whereClause,
+                attributes
+            });
+        } catch (err) {
+            console.error("Error finding CF problems:", err);
+            return [];
+        }
     }
 
     static async filterProblemsbyRating(ratingMin, ratingMax) {
-        //{rating: {$gt:ratingMin, $lt:ratingMax}}
-        let result = await this.findCFProblems({rating: {$gte:ratingMin, $lte:ratingMax}});
-        return result;
-    }
-
-    static async filterProblemsbyHandlesAndRating(handles,ratingMin,ratingMax) {
-        let ratedProblems = await this.filterProblemsbyRating(ratingMin,ratingMax);
-        let submissions1 = await CodeforcesAPI.getUserSubmissions(handles[0]);
-        let submissions2 = await CodeforcesAPI.getUserSubmissions(handles[1]);
-        let combined_submissions = submissions1.concat(submissions2.filter((item) => submissions1.indexOf(item) < 0));
-
-        //contestId index 
-        let filteredProblems = ratedProblems;
-        if (combined_submissions.length != 0) {
-            filteredProblems = ratedProblems.filter((problem) => {
-                return !(combined_submissions.some((f) => {
-                  return f.contestId === problem.contestId && f.index === problem.index;
-                }));
+        try {
+            return await db.CFProblem.findAll({
+                where: {
+                    rating: {
+                        [Op.gte]: ratingMin,
+                        [Op.lte]: ratingMax
+                    }
+                }
             });
+        } catch (err) {
+            console.error("Error filtering problems by rating:", err);
+            return [];
         }
-        return filteredProblems;
     }
 
-    static async getDuelProblems(numProblems,handles,ratingMin,ratingMax) {
-        let problems = await this.filterProblemsbyHandlesAndRating(handles,ratingMin,ratingMax);
-        let problemSet = problems.sort(() => 0.5 - Math.random());
-        return problemSet.slice(0,numProblems);
+    static async filterProblemsbyHandlesAndRating(handles, ratingMin, ratingMax) {
+        try {
+            const ratedProblems = await this.filterProblemsbyRating(ratingMin, ratingMax);
+            const submissions1 = await CodeforcesAPI.getUserSubmissions(handles[0]);
+            const submissions2 = await CodeforcesAPI.getUserSubmissions(handles[1]);
+            const combined_submissions = [...submissions1, ...submissions2.filter(item => 
+                !submissions1.some(s => s.contestId === item.contestId && s.index === item.index)
+            )];
+
+            if (combined_submissions.length === 0) {
+                return ratedProblems;
+            }
+
+            // Filter out problems that either user has already solved
+            return ratedProblems.filter(problem => 
+                !combined_submissions.some(sub => 
+                    sub.contestId === problem.contestId && sub.index === problem.index
+                )
+            );
+        } catch (err) {
+            console.error("Error filtering problems by handles and rating:", err);
+            return [];
+        }
+    }
+
+    static async getDuelProblems(numProblems, handles, ratingMin, ratingMax) {
+        try {
+            const problems = await this.filterProblemsbyHandlesAndRating(handles, ratingMin, ratingMax);
+            // Randomly shuffle the problems array
+            const shuffled = [...problems].sort(() => 0.5 - Math.random());
+            return shuffled.slice(0, numProblems);
+        } catch (err) {
+            console.error("Error getting duel problems:", err);
+            return [];
+        }
     }
 
     static async getUserSolves(duel, handle) {
-        let filteredSubmissions = await CodeforcesAPI.getUserSubmissionsAfterTime(handle, duel.startTime);
-        if (filteredSubmissions) {
-            console.log(filteredSubmissions);
-            return filteredSubmissions.reverse();
+        try {
+            const filteredSubmissions = await CodeforcesAPI.getUserSubmissionsAfterTime(handle, duel.startTime);
+            if (filteredSubmissions && filteredSubmissions.length > 0) {
+                console.log(filteredSubmissions);
+                return filteredSubmissions.reverse();
+            }
+            return [];
+        } catch (err) {
+            console.error("Error getting user solves:", err);
+            return [];
         }
-        return [];
     }
-
 }
 export default TaskManager;

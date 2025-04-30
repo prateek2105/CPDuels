@@ -85,7 +85,7 @@ const ScoreDisplay = ({
                   fontWeight="bold"
                   fontStyle={players[0].guest ? "italic" : ""}
                 >
-                  {players[0].username}
+                  {players[0].handle}
                 </Text>
                 {playerNum === 1 ? (
                   <Text textAlign="center" fontWeight="bold">
@@ -146,7 +146,7 @@ const ScoreDisplay = ({
                       fontWeight="bold"
                       fontStyle={players[1].guest ? "italic" : ""}
                     >
-                      {players[1].username}
+                      {players[1].handle}
                     </Text>
                     {playerNum === 2 ? (
                       <Text textAlign="center" fontWeight="bold">
@@ -158,7 +158,7 @@ const ScoreDisplay = ({
                   </>
                 ) : (
                   <Text textAlign="center" fontWeight="bold">
-                    {players.length === 2 ? players[1].username : "N/A"}
+                    {players.length === 2 ? players[1].handle : "N/A"}
                   </Text>
                 )}
               </GridItem>

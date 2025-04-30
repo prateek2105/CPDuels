@@ -430,7 +430,7 @@ const AccordionContainer = ({
                   ) : (
                     ""
                   )}
-                  <Box mt={2} className="problem-statement" fontSize="0.95rem">
+                  {/* <Box mt={2} className="problem-statement" fontSize="0.95rem">
                     <Text fontWeight="bold" fontSize="1.2rem">
                       Problem Statement
                     </Text>
@@ -505,9 +505,9 @@ const AccordionContainer = ({
                       ></div>
                     ) : (
                       <Text>Test cases not available</Text>
-                    )}
-                  </Box>
-                  <Box mt={2} className="problem-note" fontSize="0.95rem">
+                    )} */}
+                  {/* </Box> */}
+                  {/* <Box mt={2} className="problem-note" fontSize="0.95rem">
                     {problem?.content?.note ? (
                       <div
                         dangerouslySetInnerHTML={{
@@ -517,11 +517,11 @@ const AccordionContainer = ({
                     ) : (
                       ""
                     )}
-                  </Box>
+                  </Box> */}
                   <Center pt={3}>
                     <Button
                       onClick={duelStatus === "FINISHED" ? () => {
-                          window.open(`https://www.codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`);
+                          window.open(`https://codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`);
                         } : onOpen
                       }
                       size="md"

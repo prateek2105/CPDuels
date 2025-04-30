@@ -51,7 +51,7 @@ const FinishedDuelsTable = ({ duels, setRefresh }) => {
       },
       {
         Header: "Usernames",
-        accessor: (row) => `${row.players[0].username} v ${row.players[1].username}`,
+        accessor: (row) => `${row.players[0].handle} v ${row.players[1].handle}`,
         id: (row, index) => index,
         disableSortBy: true,
         width: "30em",
