@@ -18,6 +18,8 @@ export default class Database {
     return response;
   }
 
+  
+
   static async getCFProblemById(db_id) {
     const problem = await this._getModel(`cfproblems/${db_id}`);
     return problem;

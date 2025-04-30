@@ -21,6 +21,19 @@ class DuelManager {
         }
     }
 
+    static async checkAndUpdateProblemset() {
+        try {
+            // Check if the CFProblems table is empty
+            const count = await db.CFProblem.count();
+            if (count === 0) {
+                // If empty, update the problemset
+                await TaskManager.updateProblemset();
+            }
+        } catch (err) {
+            console.error("Error checking/updating problemset:", err);
+        }
+    }
+
     static async getDuelState(id) {
         try {
             const duel = await db.Duel.findByPk(id);
@@ -45,7 +58,10 @@ class DuelManager {
     }
 
     static async startDuel(id) {
-        // First add problems - this needs to happen before changing state
+        // First check and update problemset if needed
+        await this.checkAndUpdateProblemset();
+        console.log("Problemset checked/updated.");
+        // Then add problems - this needs to happen before changing state
         await this.addProblems(id);
         
         // Then set the start time

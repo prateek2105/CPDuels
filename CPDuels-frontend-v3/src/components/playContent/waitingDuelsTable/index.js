@@ -70,7 +70,7 @@ const WaitingDuelsTable = ({ duels, setRefresh }) => {
         Header: "Difficulty",
         accessor: (row) => (row.platform === "LC") ? 
           `${mapLCDifficulty(row.ratingMin)}-${mapLCDifficulty(row.ratingMax)}` : `${row.ratingMin}-${row.ratingMax}`,
-        id: (row) => row._id,
+        id: (row) => row.id,
         width: "4em",
       },
       {
@@ -132,7 +132,7 @@ const WaitingDuelsTable = ({ duels, setRefresh }) => {
         }
         columns={columns}
         rowProps={(row) => ({
-          onClick: () => navigate(`/play/${row.original._id}`),
+          onClick: () => navigate(`/play/${row.original.id}`),
         })}
       />
     </VStack>

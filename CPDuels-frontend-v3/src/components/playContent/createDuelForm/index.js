@@ -117,13 +117,13 @@ const CreateDuelForm = () => {
     };
     let duelID;
     await Database.addDuel(duelData).then((res) => {
-      if (!res._id) {
+      if (!res.id) {
         setSubmitting(false);
         let message;
         if (res.url) message = `${res.message}`;
         else message = res.message;
         makeToast({
-          title: "Error",
+          title: "Error This",
           description: message,
           status: "error",
           duration: 9000,
@@ -138,7 +138,7 @@ const CreateDuelForm = () => {
           duration: 2000,
           isClosable: true,
         });
-        duelID = res._id;
+        duelID = res.id;
         navigate(`/play/${duelID}`);
       }
     });

@@ -59,7 +59,7 @@ const FinishedDuelsTable = ({ duels, setRefresh }) => {
       {
         Header: "Winner",
         accessor: (row) => `${row.result?.length === 2 ? row.result[1] : row.result[0]}`,
-        id: (row) => row._id,
+        id: (row) => row.id,
         width: "8em",
       }
     ],
@@ -108,7 +108,7 @@ const FinishedDuelsTable = ({ duels, setRefresh }) => {
         }
         columns={columns}
         rowProps={(row) => ({
-          onClick: () => navigate(`/play/${row.original._id}`),
+          onClick: () => navigate(`/play/${row.original.id}`),
         })}
       />
     </VStack>

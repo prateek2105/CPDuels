@@ -59,7 +59,7 @@ const OngoingDuelsTable = ({ duels, setRefresh }) => {
       {
         Header: "Time Left",
         accessor: (row) => `${row.timeLimit - Math.floor((((new Date).getTime()/1000 - row.startTime))/60)} min`,
-        id: (row) => row._id,
+        id: (row) => row.id,
         width: "4em",
       }
     ],
@@ -111,7 +111,7 @@ const OngoingDuelsTable = ({ duels, setRefresh }) => {
         }
         columns={columns}
         rowProps={(row) => ({
-          onClick: () => navigate(`/play/${row.original._id}`),
+          onClick: () => navigate(`/play/${row.original.id}`),
         })}
       />
     </VStack>

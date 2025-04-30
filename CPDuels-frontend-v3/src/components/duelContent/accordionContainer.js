@@ -27,8 +27,8 @@ const AccordionContainer = ({
   duelPlatform,
   duelStatus,
   playerNum,
-  problems,
-  problemVerdicts,
+  problems = [], // Set default value to empty array
+  problemVerdicts = [], // Set default value to empty array
   mathJaxRendered,
   onMathJaxRendered,
   replacing,
@@ -37,31 +37,46 @@ const AccordionContainer = ({
 }) => {
   const [selectedProblem, setSelectedProblem] = useState();
   const [selectedReplaceProblemIndices, setSelectedReplaceProblemIndices] =
-    useState([]); // Initialized duel
+    useState([]);
   const [duelProblems, setDuelProblems] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
+  // Fetch problems from database when component mounts
   useEffect(() => {
     const fetchDuelProblems = async () => {
-      if (duelStatus === "ONGOING") {
-        try {
-          const duel = await Database.getDuelById(id);
-          if (duel && duel.problems) {
-            setDuelProblems(duel.problems);
-          }
-        } catch (error) {
-          console.error("Error fetching duel problems:", error);
+      setIsLoading(true);
+      try {
+        const duel = await Database.getDuelById(id);
+        console.log("Fetched duel:", duel);
+        if (duel && duel.problems && duel.problems.length > 0) {
+          setDuelProblems(duel.problems);
+        } else {
+          console.warn("No problems found in duel data");
         }
+      } catch (error) {
+        console.error("Error fetching duel problems:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchDuelProblems();
-  }, [duelStatus, id]);
+    if (id) {
+      fetchDuelProblems();
+    }
+  }, [id, duelStatus]);
+
+  // Debug logging to track props and state
+  useEffect(() => {
+    console.log("Current problems prop:", problems);
+    console.log("Current duelProblems state:", duelProblems);
+    console.log("Current duelStatus:", duelStatus);
+  }, [problems, duelProblems, duelStatus]);
 
   useEffect(() => {
     if (!mathJaxRendered && document.querySelector(".MathJaxEnd")) {
-      onMathJaxRendered();
+      onMathJaxRendered && onMathJaxRendered();
     }
-  }, [mathJaxRendered]);
+  }, [mathJaxRendered, onMathJaxRendered]);
 
   const defaultBorderColor = useColorModeValue(
     "rgb(0, 0, 0, 0.5)",
@@ -88,14 +103,17 @@ const AccordionContainer = ({
   };
 
   useEffect(() => {
-    socket.on("replace-problem-received", ({ roomId, uid, updatedIndices }) => {
+    const handleReplaceProblemReceived = ({ roomId, uid, updatedIndices }) => {
       let localUid = getUID();
       if (roomId === id && uid !== localUid) {
         setSelectedReplaceProblemIndices(updatedIndices);
       }
-    });
+    };
+    
+    socket.on("replace-problem-received", handleReplaceProblemReceived);
+    
     return () => {
-      socket.off("replace-problem-received");
+      socket.off("replace-problem-received", handleReplaceProblemReceived);
     };
   }, [id]);
 
@@ -116,8 +134,21 @@ const AccordionContainer = ({
     }
   };
 
+  // Helper function to check if problems array is valid
+  const hasValidProblems = (problemsArray) => {
+    return Array.isArray(problemsArray) && problemsArray.length > 0;
+  };
+
+  // Determine which problems array to use
+  const displayProblems = hasValidProblems(problems) ? problems : 
+                         hasValidProblems(duelProblems) ? duelProblems : [];
+
+  if (isLoading) {
+    return <Text fontSize="1.2rem">Loading problems...</Text>;
+  }
+
   if (duelStatus === "INITIALIZED") {
-    if (playerNum)
+    if (playerNum && hasValidProblems(displayProblems))
       return (
         <MathJax dynamic={true}>
           <Box>
@@ -130,8 +161,9 @@ const AccordionContainer = ({
             </Text>
             <Flex mb="1em" gap={1} justify="center" height="fit-content">
               <ButtonGroup>
-                {problems.map((problem, index) => (
+                {displayProblems.map((problem, index) => (
                   <Button
+                    key={index}
                     width="3.5em"
                     height="3.5em"
                     color={
@@ -148,17 +180,9 @@ const AccordionContainer = ({
                     onClick={() => {
                       let updatedIndices;
                       if (selectedReplaceProblemIndices.includes(index)) {
-                        updatedIndices = [];
-                        for (
-                          let i = 0;
-                          i < selectedReplaceProblemIndices.length;
-                          i++
-                        ) {
-                          if (selectedReplaceProblemIndices[i] !== index)
-                            updatedIndices.push(
-                              selectedReplaceProblemIndices[i]
-                            );
-                        }
+                        updatedIndices = selectedReplaceProblemIndices.filter(
+                          idx => idx !== index
+                        );
                       } else {
                         updatedIndices = [
                           ...selectedReplaceProblemIndices,
@@ -201,100 +225,95 @@ const AccordionContainer = ({
               allowToggle
               boxShadow="2xl"
             >
-              {console.count("Initialized Accordion Container")}
               {duelPlatform === "CF"
-                ? problems?.length
-                  ? problems.map((problem, index) => (
-                      <AccordionItem key={problem?._id} border="none">
-                        <h2>
-                          <AccordionButton
-                            height="3.5em"
-                            bg={
-                              index === selectedProblem - 1
-                                ? selectedRowColor
+                ? displayProblems.map((problem, index) => (
+                    <AccordionItem key={problem?.id || `cf-problem-${index}`} border="none">
+                      <h2>
+                        <AccordionButton
+                          height="3.5em"
+                          bg={
+                            index === selectedProblem - 1
+                              ? selectedRowColor
+                              : ""
+                          }
+                          _hover={"none"}
+                          border="solid 1px"
+                        >
+                          <Box flex="2" textAlign="left">
+                            {index + 1}. <b>{problem?.name || "Unnamed Problem"}</b>
+                          </Box>
+                          <Box flex="1" textAlign="center">
+                            <b>Rated:</b> {problem?.rating || "N/A"}, <b>Points:</b>{" "}
+                            {problem?.duelPoints || 0}
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                      </h2>
+                      <AccordionPanel border="solid 1px" borderTop={"none"}>
+                        <Box
+                          className="problem-statement"
+                          fontSize="0.95rem"
+                          mb="-1.5em"
+                        >
+                          <div
+                            className={
+                              index === displayProblems.length - 1
+                                ? "MathJaxEnd"
                                 : ""
                             }
-                            _hover={"none"}
-                            border="solid 1px"
-                          >
-                            <Box flex="2" textAlign="left">
-                              {index + 1}. <b>{problem?.name}</b>
-                            </Box>
-                            <Box flex="1" textAlign="center">
-                              <b>Rated:</b> {problem?.rating}, <b>Points:</b>{" "}
-                              {problem.duelPoints}
-                            </Box>
-                            <AccordionIcon />
-                          </AccordionButton>
-                        </h2>
-                        <AccordionPanel border="solid 1px" borderTop={"none"}>
-                          <Box
-                            className="problem-statement"
-                            fontSize="0.95rem"
-                            mb="-1.5em"
-                          >
-                            <div
-                              className={
-                                index === problems.length - 1
-                                  ? "MathJaxEnd"
-                                  : ""
-                              }
-                              dangerouslySetInnerHTML={{
-                                __html: problem.content?.statement,
-                              }}
-                            ></div>
-                          </Box>
-                        </AccordionPanel>
-                      </AccordionItem>
-                    ))
-                  : ""
+                            dangerouslySetInnerHTML={{
+                              __html: problem?.content?.statement || "Problem statement not available",
+                            }}
+                          ></div>
+                        </Box>
+                      </AccordionPanel>
+                    </AccordionItem>
+                  ))
                 : duelPlatform === "LC"
-                ? problems?.length
-                  ? problems.map((problem, index) => (
-                      <AccordionItem key={problem?._id} border="none">
-                        <h2>
-                          <AccordionButton
-                            height="3.5em"
-                            bg={
-                              index === selectedProblem - 1
-                                ? selectedRowColor
+                ? displayProblems.map((problem, index) => (
+                    <AccordionItem key={problem?.id || `lc-problem-${index}`} border="none">
+                      <h2>
+                        <AccordionButton
+                          height="3.5em"
+                          bg={
+                            index === selectedProblem - 1
+                              ? selectedRowColor
+                              : ""
+                          }
+                          _hover={"none"}
+                          border="solid 1px"
+                        >
+                          <Box flex="2" textAlign="left">
+                            {index + 1}. <b>{problem?.name || "Unnamed Problem"}</b>
+                          </Box>
+                          <Box flex="1" textAlign="center">
+                            <b>Rated:</b> {mapLCRatings(problem?.difficulty)},{" "}
+                            <b>Points:</b> {problem?.duelPoints || 0}
+                          </Box>
+                          <AccordionIcon />
+                        </AccordionButton>
+                      </h2>
+                      <AccordionPanel border="solid 1px" borderTop={"none"}>
+                        <Box
+                          className="lc-problem-statement"
+                          fontSize="0.95rem"
+                          mb="-2.5em"
+                        >
+                          <div
+                            className={
+                              index === displayProblems.length - 1
+                                ? "MathJaxEnd"
                                 : ""
                             }
-                            _hover={"none"}
-                            border="solid 1px"
-                          >
-                            <Box flex="2" textAlign="left">
-                              {index + 1}. <b>{problem?.name}</b>
-                            </Box>
-                            <Box flex="1" textAlign="center">
-                              <b>Rated:</b> {mapLCRatings(problem?.difficulty)},{" "}
-                              <b>Points:</b> {problem.duelPoints}
-                            </Box>
-                            <AccordionIcon />
-                          </AccordionButton>
-                        </h2>
-                        <AccordionPanel border="solid 1px" borderTop={"none"}>
-                          <Box
-                            className="lc-problem-statement"
-                            fontSize="0.95rem"
-                            mb="-2.5em"
-                          >
-                            <div
-                              className={
-                                index === problems.length - 1
-                                  ? "MathJaxEnd"
-                                  : ""
-                              }
-                              dangerouslySetInnerHTML={{
-                                __html: problem.content?.problemPreview,
-                              }}
-                            ></div>
-                          </Box>
-                        </AccordionPanel>
-                      </AccordionItem>
-                    ))
-                  : ""
-                : ""}
+                            dangerouslySetInnerHTML={{
+                              __html: problem?.content?.problemPreview || "Problem preview not available",
+                            }}
+                          ></div>
+                        </Box>
+                      </AccordionPanel>
+                    </AccordionItem>
+                  ))
+                : <Text>Unsupported platform.</Text>}
             </Accordion>
           </Box>
         </MathJax>
@@ -302,29 +321,37 @@ const AccordionContainer = ({
     else
       return (
         <Text fontSize="1.2rem">
-          This duel is no longer open and problems are being finalized.
+          {hasValidProblems(displayProblems) 
+            ? "This duel is no longer open and problems are being finalized."
+            : "No problems have been loaded for this duel yet. Please wait for the host to load problems."}
         </Text>
       );
   } else if (duelStatus === "ONGOING") {
+    // Fixed the ongoing status view
     return (
       <Box>
         <Text fontSize="1.2rem" mb={3}>Problem links for this duel:</Text>
-        {duelProblems.map((problem, index) => (
-          <Text key={index} fontSize="1.1rem" mb={2}>
-            {index + 1}. <a 
-              href={`https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{color: 'blue', textDecoration: 'underline'}}
-            >
-              {problem.name}
-            </a>
-          </Text>
-        ))}
+        {hasValidProblems(displayProblems) ? (
+          displayProblems.map((problem, index) => (
+            <Text key={index} fontSize="1.1rem" mb={2}>
+              {index + 1}. <a 
+                href={`https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{color: 'blue', textDecoration: 'underline'}}
+              >
+                {problem.name || "Unnamed Problem"}
+              </a>
+            </Text>
+          ))
+        ) : (
+          <Text>No problems available. Please wait for the duel to load problems.</Text>
+        )}
       </Box>
     );
   } else {
-    return problems?.length ? (
+    // For other statuses like FINISHED
+    return hasValidProblems(displayProblems) ? (
       <Accordion
         onChange={(index) => {
           setSelectedProblem(index + 1);
@@ -332,7 +359,6 @@ const AccordionContainer = ({
         allowToggle
         boxShadow="2xl"
       >
-        {console.count("Ongoing Accordion Container")}
         {playerNum ? (
           ""
         ) : duelStatus === "ONGOING" ? (
@@ -343,8 +369,8 @@ const AccordionContainer = ({
           ""
         )}
         {duelPlatform === "CF"
-          ? problems.map((problem, index) => (
-              <AccordionItem key={problem._id} border="none">
+          ? displayProblems.map((problem, index) => (
+              <AccordionItem key={problem?.id || `cf-problem-${index}`} border="none">
                 <h2>
                   <AccordionButton
                     height="3.5em"
@@ -374,11 +400,11 @@ const AccordionContainer = ({
                     }
                   >
                     <Box flex="2" textAlign="left">
-                      {index + 1}. <b>{problem?.name}</b>
+                      {index + 1}. <b>{problem?.name || "Unnamed Problem"}</b>
                     </Box>
                     <Box flex="1" textAlign="center">
-                      <b>Rated:</b> {problem?.rating}, <b>Points:</b>{" "}
-                      {problem?.duelPoints}
+                      <b>Rated:</b> {problem?.rating || "N/A"}, <b>Points:</b>{" "}
+                      {problem?.duelPoints || 0}
                     </Box>
                     <AccordionIcon />
                   </AccordionButton>
@@ -411,14 +437,14 @@ const AccordionContainer = ({
                     {problem?.content?.statement ? (
                       <div
                         className={
-                          index === problems.length - 1 ? "MathJaxEnd" : ""
+                          index === displayProblems.length - 1 ? "MathJaxEnd" : ""
                         }
                         dangerouslySetInnerHTML={{
                           __html: problem.content?.statement,
                         }}
                       ></div>
                     ) : (
-                      ""
+                      <Text>Problem statement not available</Text>
                     )}
                   </Box>
                   <Box
@@ -436,7 +462,7 @@ const AccordionContainer = ({
                         }}
                       ></div>
                     ) : (
-                      ""
+                      <Text>Input specifications not available</Text>
                     )}
                   </Box>
                   <Box
@@ -454,7 +480,7 @@ const AccordionContainer = ({
                         }}
                       ></div>
                     ) : (
-                      ""
+                      <Text>Output specifications not available</Text>
                     )}
                   </Box>
                   <Box
@@ -478,7 +504,7 @@ const AccordionContainer = ({
                         }}
                       ></div>
                     ) : (
-                      ""
+                      <Text>Test cases not available</Text>
                     )}
                   </Box>
                   <Box mt={2} className="problem-note" fontSize="0.95rem">
@@ -511,8 +537,8 @@ const AccordionContainer = ({
               </AccordionItem>
             ))
           : duelPlatform === "LC"
-          ? problems.map((problem, index) => (
-              <AccordionItem key={problem._id} border="none">
+          ? displayProblems.map((problem, index) => (
+              <AccordionItem key={problem?.id || `lc-problem-${index}`} border="none">
                 <h2>
                   <AccordionButton
                     height="3.5em"
@@ -542,11 +568,11 @@ const AccordionContainer = ({
                     }
                   >
                     <Box flex="2" textAlign="left">
-                      {index + 1}. <b>{problem?.name}</b>
+                      {index + 1}. <b>{problem?.name || "Unnamed Problem"}</b>
                     </Box>
                     <Box flex="1" textAlign="center">
                       <b>Rated:</b> {mapLCRatings(problem?.difficulty)}, <b>Points:</b>{" "}
-                      {problem?.duelPoints}
+                      {problem?.duelPoints || 0}
                     </Box>
                     <AccordionIcon />
                   </AccordionButton>
@@ -570,14 +596,14 @@ const AccordionContainer = ({
                     {problem?.content?.problemWhole ? (
                       <div
                         className={
-                          index === problems.length - 1 ? "MathJaxEnd" : ""
+                          index === displayProblems.length - 1 ? "MathJaxEnd" : ""
                         }
                         dangerouslySetInnerHTML={{
                           __html: problem.content?.problemWhole,
                         }}
                       ></div>
                     ) : (
-                      ""
+                      <Text>Problem content not available</Text>
                     )}
                   </Box>
                   <Center pt={3}>
@@ -595,30 +621,12 @@ const AccordionContainer = ({
                 </AccordionPanel>
               </AccordionItem>
             ))
-          : ""}
+          : <Text>Unsupported platform.</Text>}
       </Accordion>
     ) : (
-      problems?.length ? (
-        <Box>
-          <Text fontSize="1.2rem" mb={3}>Problem links for this duel:</Text>
-          {problems.map((problem, index) => (
-            <Text key={index} fontSize="1.1rem" mb={2}>
-              {index + 1}. <a 
-                href={ `https://www.codeforces.com/problemset/problem/${problem.contestId}/${problem.index}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{color: 'blue', textDecoration: 'underline'}}
-              >
-                {problem.name}
-              </a>
-            </Text>
-          ))}
-        </Box>
-      ) : (
-        <Text fontSize="1.2rem">
-          Problem duel not started.
-        </Text>
-      )
+      <Text fontSize="1.2rem">
+        Problem duel not started or no problems available.
+      </Text>
     );
   }
 };
