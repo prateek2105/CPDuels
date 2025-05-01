@@ -39,7 +39,7 @@ const JoinDisplay = ({ id, playerNum }) => {
   const [joiningGuest, setJoiningGuest] = useState(false);
   const toastRef = useRef();
   const toast = useToast();
-  const link = `https://localhost:4000/play/${id}`;
+  const link = `http://localhost:4000/play/${id}`;
 
   const handleJoin = (e) => {
     e.preventDefault();
