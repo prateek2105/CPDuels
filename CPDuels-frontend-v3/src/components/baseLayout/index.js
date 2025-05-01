@@ -22,7 +22,7 @@ import {
   Switch,
 } from "@chakra-ui/react";
 import { WiDaySunny } from "react-icons/wi";
-import { IoMoon, IoClose } from "react-icons/io5";
+import { IoMoon, IoClose, IoArrowBack } from "react-icons/io5";
 import LightLogo from "../../images/CPDuels Logo Light - NEW.svg";
 import DarkLogo from "../../images/CPDuels Logo Dark - NEW.svg";
 import { HiMenuAlt4 } from "react-icons/hi";
@@ -30,7 +30,7 @@ import { HiMenuAlt4 } from "react-icons/hi";
 const Banner = ({ setShowBanner }) => {
   return (
     <Flex mx="calc(-50vw)" backgroundColor="red" height={["4em", "2.5em"]} justify="center">
-      <Text color="offWhite" fontSize={["1rem", "1.1rem"]} mt="0.4em"><b>LeetCode</b> and <b>AtCoder</b> coming soon!</Text>
+      
       <IconButton
         my="auto"
         variant="unstyled"
@@ -130,18 +130,30 @@ const MobileBaseNavbar = () => {
   const navigate = useNavigate();
   const { colorMode, toggleColorMode } = useColorMode();
   const navigateHome = () => navigate("/");
+  
+  const handleBack = () => {
+    window.location.href = 'http://localhost:3000/';
+  };
 
   return (
     <Flex justify="space-between" align="center" mt={1} mx={0}>
-      <Image
-        aria-label="CPDuels logo"
-        src={colorMode === "light" ? LightLogo : DarkLogo}
-        w="10em"
-        h="auto"
-        mt={1}
-        cursor="pointer"
-        onClick={navigateHome}
-      />
+      <Flex align="center" gap={4}>
+        <IconButton
+          icon={<IoArrowBack size={24} />}
+          variant="ghost"
+          onClick={handleBack}
+          aria-label="Go back"
+        />
+        <Image
+          aria-label="CPDuels logo"
+          src={colorMode === "light" ? LightLogo : DarkLogo}
+          w="10em"
+          h="auto"
+          mt={1}
+          cursor="pointer"
+          onClick={navigateHome}
+        />
+      </Flex>
       <HamburgerMenu />
     </Flex>
   );
@@ -151,6 +163,10 @@ const BaseNavbar = () => {
   const navigate = useNavigate();
   const { colorMode, toggleColorMode } = useColorMode();
   const navigateHome = () => navigate("/");
+  
+  const handleBack = () => {
+    window.location.href = 'http://localhost:3000/';
+  };
 
   return (
     <Flex
@@ -161,14 +177,22 @@ const BaseNavbar = () => {
       px={2}
       pt={2}
     >
-      <Image
-        aria-label="CPDuels logo"
-        src={colorMode === "light" ? LightLogo : DarkLogo}
-        w="10em"
-        h="auto"
-        cursor="pointer"
-        onClick={navigateHome}
-      />
+      <Flex align="center" gap={4}>
+        <IconButton
+          icon={<IoArrowBack size={24} />}
+          variant="ghost"
+          onClick={handleBack}
+          aria-label="Go back"
+        />
+        <Image
+          aria-label="CPDuels logo"
+          src={colorMode === "light" ? LightLogo : DarkLogo}
+          w="10em"
+          h="auto"
+          cursor="pointer"
+          onClick={navigateHome}
+        />
+      </Flex>
       <HStack
         fontSize="1.5rem"
         fontWeight="800"

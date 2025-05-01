@@ -39,7 +39,7 @@ const JoinDisplay = ({ id, playerNum }) => {
   const [joiningGuest, setJoiningGuest] = useState(false);
   const toastRef = useRef();
   const toast = useToast();
-  const link = `https://localhost:3000/play/${id}`;
+  const link = `https://localhost:4000/play/${id}`;
 
   const handleJoin = (e) => {
     e.preventDefault();
@@ -102,7 +102,7 @@ const JoinDisplay = ({ id, playerNum }) => {
       title: "Copied!",
       description: "The link is now in your clipboard.",
       status: "success",
-      duration: 3000,
+      duration: 4000,
       isClosable: true,
     });
   };
@@ -133,7 +133,7 @@ const JoinDisplay = ({ id, playerNum }) => {
       <InputGroup px={2}>
         <Input
           type="text"
-          value={`https://localhost:3000/play/${id}`}
+          value={`https://localhost:4000/play/${id}`}
           size="md"
           textOverflow="ellipsis"
           readOnly

@@ -102,7 +102,7 @@ io.on('connection', async (socket) => {
                             await DuelManager.finishDuel(roomId);
                             io.emit('status-change', {roomId: roomId, newStatus: "FINISHED"});
                         }
-                    }, 3000);
+                    }, 4000);
                     timeInterval = setInterval(async () => {
                         let timeLeft = await getTimeLeft(startTime, maxTime, timeInterval, checkInterval, roomId, io);
                         io.emit('time-left', {roomId: roomId, timeLeft: timeLeft});
@@ -147,7 +147,7 @@ io.on('connection', async (socket) => {
                     await DuelManager.finishDuel(roomId);
                     io.emit('status-change', {roomId: roomId, newStatus: "FINISHED"});
                 }
-            }, 3000);
+            }, 4000);
             timeInterval = setInterval(async () => {
                 let timeLeft = await getTimeLeft(startTime, maxTime, timeInterval, checkInterval, roomId, io);
                 io.emit('time-left', {roomId: roomId, timeLeft: timeLeft});
